@@ -1,16 +1,16 @@
 use anchor_lang::prelude::*;
 use anchor_lang::solana_program;
 use anchor_lang::solana_program::system_instruction;
+use anchor_lang::solana_program::system_program;
 use anchor_spl::token;
+use anchor_lang::event;
+use anchor_lang::emit;
 
-declare_id!("7LruXpuU5sUkRovmSbQsFGcgwVCarSa4GisRJodP3juM");
+declare_id!("8fK3EArbLPuao6tZVAn6te9yJkxAHay2JcBcauk61cBN");
 
 #[program]
-mod solana_lock {
+mod dojbridge {
     use super::*;
-    pub fn initialize(ctx: Context<Initialize>) -> ProgramResult {
-        return Ok(());
-    }
 
     pub fn transfer_tokens(ctx: Context<TransferNonNative>, amount: u64) -> ProgramResult {
         let sender = &ctx.accounts.from;
@@ -33,7 +33,7 @@ mod solana_lock {
         return Ok(());
     }
 
-    pub fn transfer_nat_tokens(ctx: Context<TransferNative>, amount: u64) -> ProgramResult {
+    pub fn transfer_nat_tokens(ctx: Context<TransferNative>, dest_blockchain: String,amount: u64, asset: String) -> ProgramResult {
         let ix = system_instruction::transfer(
             &ctx.accounts.from.key(),
             &ctx.accounts.to.key(),
@@ -44,16 +44,22 @@ mod solana_lock {
             &[
                 ctx.accounts.from.to_account_info(),
                 ctx.accounts.to.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
             ],
         )?;
-    
+        
+        emit!(LockEvent {
+            source_blockchain: "Solana".to_string(),
+            dest_blockchain: dest_blockchain,
+            sender: ctx.accounts.from.key(),
+            amount: amount,
+            asset: asset,
+        });
+
         return Ok(());
     }
 
 }
-
-#[derive(Accounts)]
-pub struct Initialize {}
 
 
 #[derive(Accounts)]
@@ -69,6 +75,7 @@ pub struct TransferNonNative<'info> {
     pub token_program: Program<'info, token::Token>,
 }
 
+
 #[derive(Accounts)]
 #[instruction(amount: u64)]
 pub struct TransferNative<'info> {
@@ -76,4 +83,15 @@ pub struct TransferNative<'info> {
     pub from: Signer<'info>,
     #[account(mut)]
     pub to: Account<'info, token::TokenAccount>,
+    pub system_program: Program<'info, System>,
+}
+
+#[event]
+pub struct LockEvent {
+    pub source_blockchain: String,
+    pub dest_blockchain: String,
+    #[index]
+    pub sender: Pubkey,
+    pub amount: u64,
+    pub asset: String,
 }
